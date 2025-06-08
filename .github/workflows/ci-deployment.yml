@@ -1,0 +1,102 @@
+name: CI/CD on Tag
+
+on:
+  push:
+    tags:
+      - 'v*'                # only run on tags like v1.0.0, v2.3.4, etc.
+
+env:
+  DOCKERHUB_REPO: jeacott/weblayers
+
+jobs:
+  build-and-push:
+    name: Build & Push Images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up QEMU (for multi-arch builds)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & push Frontend image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.DOCKERHUB_REPO }}-frontend:${{ github.ref_name }}
+            ${{ env.DOCKERHUB_REPO }}-frontend:v3
+
+      - name: Build & push Backend image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.DOCKERHUB_REPO }}-backend:${{ github.ref_name }}
+            ${{ env.DOCKERHUB_REPO }}-backend:latest
+
+  deploy-to-kind:
+    name: Deploy & Smoke-Test in Kind
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Kind cluster
+        uses: engineerd/setup-kind@v0.11.1
+        with:
+          version: v0.20.0
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Load images into Kind
+        run: |
+          kind load docker-image ${{ env.DOCKERHUB_REPO }}-frontend:${{ github.ref_name }}
+          kind load docker-image ${{ env.DOCKERHUB_REPO }}-backend:${{ github.ref_name }}
+
+      - name: Create Docker Hub pull secret
+        env:
+          DH_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+          DH_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          kubectl create secret docker-registry dockerhub-reg \
+            --docker-server=https://index.docker.io/v1/ \
+            --docker-username=$DH_USER \
+            --docker-password=$DH_TOKEN \
+            --namespace=weblayers \
+            --dry-run=client -o yaml \
+          | kubectl apply -f -
+
+      - name: Deploy Manifests
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/configmap.yaml -n weblayers
+          kubectl apply -f k8s/postgres-deployment.yaml -n weblayers
+          kubectl apply -f k8s/backend-deployment.yaml -n weblayers
+          kubectl apply -f k8s/frontend-deployment.yaml -n weblayers
+
+      - name: Smoke-test /api/events
+        run: |
+          # wait for pods to be ready
+          kubectl wait --for=condition=available --timeout=120s deployment/backend  -n weblayers
+          kubectl wait --for=condition=available --timeout=120s deployment/frontend -n weblayers
+          # run a test curl from a temporary pod
+          kubectl run curlpod --rm -i --restart=Never --image=radial/busyboxplus:curl -n weblayers -- \
+            sh -c "curl -s http://backend:8000/api/events | jq ."
