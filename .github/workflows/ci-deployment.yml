@@ -93,6 +93,10 @@ jobs:
         with:
           version: 'latest'
 
+      - name: Deploy Namespace
+        run: |
+          kubectl apply -f k8s/namespaces.yaml
+
       - name: Create DockerHub Pull Secret
         env:
           DH_USER: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -108,7 +112,7 @@ jobs:
 
       - name: Deploy to Kind
         run: |
-          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/namespaces.yaml
           kubectl apply -n weblayers -f k8s/configmap.yaml
           kubectl apply -n weblayers -f k8s/postgres-deployment.yaml
           kubectl apply -n weblayers -f k8s/backend-deployment.yaml
