@@ -1,7 +1,10 @@
 name: CI/CD
 
 env:
-  DOCKERHUB_REPO: jeacott/weblayers
+  # ← Load your Docker Hub username from Secrets
+  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+  # ← Build your repo path directly off that same Secret
+  DOCKERHUB_REPO: ${{ secrets.DOCKERHUB_USERNAME }}/weblayers
 
 on:
   push:
@@ -81,7 +84,7 @@ jobs:
             ${{ env.DOCKERHUB_REPO }}-frontend:latest
 
       - name: Set up Kind
-        uses: engineerd/setup-kind@v0.11.1
+        uses: engineerd/setup-kind@v0.11.0
         with:
           version: v0.20.0
 
