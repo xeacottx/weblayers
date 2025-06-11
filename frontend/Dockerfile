@@ -13,4 +13,9 @@ RUN npm run build
 
 # -------- Production Stage --------
 FROM nginx:alpine
+
+# Copy the built React app
 COPY --from=build /app/build /usr/share/nginx/html
+
+# Overwrite default.conf with your nginx.conf
+COPY nginx.conf /etc/nginx/conf.d/default.conf

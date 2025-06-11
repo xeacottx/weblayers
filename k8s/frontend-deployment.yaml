@@ -17,7 +17,7 @@ spec:
         - name: dockerhub-reg
       containers:
         - name: frontend
-          image: weblayers-frontend:v3
+          image: weblayers-frontend:v5
           imagePullPolicy: Never
           ports:
             - containerPort: 80

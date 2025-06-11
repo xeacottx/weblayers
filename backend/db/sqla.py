@@ -1,18 +1,18 @@
 # db.py
 import psycopg
+import os
 from datetime import datetime
+from db.validate import validate_event_data
 
-DB_USER = "postgres"
-DB_PASSWORD = "postgres"
-DB_HOST = "postgres"
-DB_PORT = 5432
-DB_NAME = "weblayers"
+def get_db_url():
+    return (
+        f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}"
+        f"@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
+    )
 
-DB_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-
-def insert_event(timestamp, client_ip, message):
-    print(f"here is our shit: {client_ip} and {message}")
-    print(f"here is the full DB URI : {DB_URL}")
+@validate_event_data
+def insert_event(event_name, timestamp, client_ip, message, *args, **kwargs):
+    DB_URL = get_db_url()
     with psycopg.connect(DB_URL) as conn:
         with conn.cursor() as cur:
             cur.execute(

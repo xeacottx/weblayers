@@ -1,45 +1,48 @@
-import React, { useEffect, useState } from 'react';
+// src/App.js
+import React, { useState, useEffect } from 'react';
 import './App.css';
 
 function App() {
-  const [events, setEvents] = useState(null);
+  const [event, setEvent]     = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const apiBase = process.env.REACT_APP_API_URL || '';
+  const [error, setError]     = useState(null);
 
-  console.log('Using API base URL:', apiBase);
+  useEffect(() => {
+    fetch('/api/events')
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+        return res.json();
+      })
+      .then(data => {setEvent(data);})
+      .catch(err => {
+        console.error('Fetch error:', err);
+        setError(err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
 
-  fetch(`${apiBase}/api/events`)
-    .then((res) => {
-      if (!res.ok) {
-        throw new Error(`HTTP error! Status: ${res.status}`);
-      }
-      return res.json();
-    })
-    .then((data) => {
-      // handle the fetched data
-      console.log('Fetched data:', data);
-    })
-    .catch((err) => {
-      console.error('Error fetching events:', err);
-    });
+  // Render logic
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+  if (error) {
+    return <div style={{ color: 'red' }}>Error: {error.message}</div>;
+  }
+  if (event.length === 0) {
+    return <div>No events found.</div>;
+  }
 
   return (
-    <div className="app-container">
-      <h1>Welcome to WebLayers</h1>
-      <p>This is a visualization of what happens when you click a link.</p>
-      <img src="/diagram-placeholder.svg" alt="Layer Diagram" style={{ maxWidth: '100%' }} />
-
-      <div style={{ marginTop: '2rem' }}>
-        <h2>Event Info</h2>
-        {loading && <p>Loading...</p>}
-        {error && <p style={{ color: 'red' }}>Error: {error}</p>}
-        {events && (
-          <pre style={{ background: '#eee', padding: '1rem' }}>
-            {JSON.stringify(events, null, 2)}
-          </pre>
-        )}
-      </div>
+    <div className="App" style={{ padding: '2rem' }}>
+      <h1>WebLayers Demo</h1>
+      <h2>Event Info</h2>
+      <div style={{ marginBottom: '1rem' }}>
+        <strong>{new Date(event.timestamp).toLocaleString()}</strong><br/>
+        IP: {event.client_ip}<br/>
+       Message: {event.message}
+     </div>
     </div>
   );
 }
